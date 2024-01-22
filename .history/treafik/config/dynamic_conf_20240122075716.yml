@@ -1,0 +1,35 @@
+http:
+  routers:
+    router-chobase:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.chobase.com`)"
+      entryPoints: ["websecure"]
+      service: "service-chobase"
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "chobase.com"
+            sans: ["*.chobase.com"]
+
+    router-bigbase:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.bigbase.kr`)"
+      entryPoints: ["websecure"]
+      service: "service-bigbase"
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "bigbase.kr"
+            sans: ["*.bigbase.kr"]
+      # ... 유사한 설정
+# 미들웨어 정의
+  middlewares:
+    my-middleware:
+      stripPrefix:
+        prefixes:
+          - "/prefix"
+          
+# 서비스 정의
+  services:
+    my-service:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.2:80"

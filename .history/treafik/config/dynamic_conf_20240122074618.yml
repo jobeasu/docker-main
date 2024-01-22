@@ -1,0 +1,17 @@
+http:
+  routers:
+    router1:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.example.com`)"
+      entryPoints: ["websecure"]
+      service: "service1"
+      tls:
+        certResolver: myresolver
+        domains:
+          - main: "example.com"
+            sans: ["*.example.com"]
+    router2:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.example.net`)"
+      # ... 유사한 설정
+    router3:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.example.org`)"
+      # ... 유사한 설정

@@ -1,0 +1,37 @@
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: true
+
+api:
+  dashboard: true
+
+entryPoints:
+  ssh:
+    address: ":22"
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    swarmMode: true
+    exposedByDefault: false
+    network: traefik-public
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "intbus@naver.com"
+      storage: "/acme/acme.json"
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1"
+          - "1.0.0.1"
+log:
+  filePath: "log/traefik.log"
+  level: WARN
+accessLog:
+  filePath: "log/access.log"
+  bufferingSize: 100 

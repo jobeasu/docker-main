@@ -1,0 +1,25 @@
+http:
+  routers:
+    router-chobase:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.chobase.com`)"
+      entryPoints: ["websecure"]
+      service: "service-chobase"
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "chobase.com"
+            sans: ["*.chobase.com"]
+
+    router-chobase:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.chobase.com`)"
+      entryPoints: ["websecure"]
+      service: "service-chobase"
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "chobase.com"
+            sans: ["*.chobase.com"]
+      # ... 유사한 설정
+    router3:
+      rule: "HostRegexp(`{subdomain:[a-zA-Z0-9-]+}.example.org`)"
+      # ... 유사한 설정

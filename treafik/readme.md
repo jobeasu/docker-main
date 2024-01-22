@@ -1,0 +1,204 @@
+Traefik 2.2, Docker Swarm, Let's Encrypt를 사용하여 Cloudflare DNS를 이용한 여러 와일드카드 도메인의 SSL 설정을 구성하는 과정은 여러 단계로 나눠 설명할 수 있습니다. 이 설정은 Let's Encrypt의 ACME 프로토콜을 통한 DNS 챌린지를 사용하여 와일드카드 인증서를 발급받는 것을 포함합니다.
+
+### 1. Cloudflare API 키 및 설정
+
+Cloudflare에서 DNS 챌린지를 사용하려면, 먼저 Cloudflare의 API 키가 필요합니다.
+
+1. **Cloudflare에서 API 키 획득**:
+   - Cloudflare 계정에 로그인합니다.
+   - "내 프로필"로 이동하여 "API 토큰" 섹션에서 "API 키"를 확인합니다.
+   - 필요한 경우, 새 API 토큰을 생성합니다.
+
+2. **환경 변수로 API 키 저장**:
+   - Cloudflare의 API 키와 이메일 주소를 안전하게 저장합니다. 예를 들어, 이 정보를 환경 변수로 설정할 수 있습니다.
+
+### 2. Traefik 구성 파일 준비
+
+`traefik.yml` 파일을 생성하고, 필요한 설정을 추가합니다.
+
+1. **Traefik 정적 구성 (traefik.yml)**:
+   ```yaml
+   api:
+     dashboard: true
+
+   entryPoints:
+     web:
+       address: ":80"
+     websecure:
+       address: ":443"
+
+   providers:
+     docker:
+       swarmMode: true
+       exposedByDefault: false
+       network: traefik-public
+
+   certificatesResolvers:
+     myresolver:
+       acme:
+         email: "your-email@example.com"
+         storage: "/acme/acme.json"
+         dnsChallenge:
+           provider: cloudflare
+           resolvers:
+             - "1.1.1.1"
+             - "1.0.0.1"
+   ```
+
+   여기서 `your-email@example.com`을 Cloudflare 계정 이메일로 교체합니다.
+
+2. **환경 변수 파일 (.env)**:
+   - Traefik이 Cloudflare API에 접근할 수 있도록 필요한 환경 변수를 `.env` 파일에 저장합니다.
+   - 예를 들어:
+     ```
+     CLOUDFLARE_API_KEY=your_cloudflare_api_key
+     CLOUDFLARE_EMAIL=your_cloudflare_email
+     ```
+
+### 3. Traefik 서비스 배포
+
+Docker Compose를 사용하여 Traefik 서비스를 Swarm 모드로 배포합니다.
+
+1. **Docker Compose 파일 (docker-compose.yml)**:
+   ```yaml
+   version: '3.7'
+
+   services:
+     traefik:
+       image: traefik:v2.2
+       command:
+         - "--configFile=/traefik/traefik.yml"
+       ports:
+         - "80:80"
+         - "443:443"
+       volumes:
+         - /var/run/docker.sock:/var/run/docker.sock
+         - ./traefik.yml:/traefik/traefik.yml
+         - ./acme:/acme
+       environment:
+         - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+         - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
+       networks:
+         - traefik-public
+       deploy:
+         labels:
+           - "traefik.enable=true"
+           - "traefik.http.routers.api.rule=Host(`traefik.example.com`)"
+           - "traefik.http.routers.api.service=api@internal"
+
+   networks:
+     traefik-public:
+       external: true
+   ```
+
+2. **배포**:
+   - Docker Swarm에서 `docker stack deploy -c docker-compose.yml traefik` 명령을 사용하여 Traefik을 배포합니다.
+
+### 4. Let's Encrypt 인증서 발급
+
+Traefik이 실행되면, Let's Encrypt를 통해 지정된 와일드카드 도메인에 대한 인증서를 자동으로 발급받습니다. 
+
+- Traefik은 Cloudflare DNS 챌린지를 사용하여 와일드카드 인증서를 발급받을 것입니다.
+- `acme.json`
+
+ 파일을 확인하여 인증서 상태를 확인할 수 있습니다.
+
+### 5. 도메인별 라우팅 설정
+
+각각의 와일드카드 도메인에 대해, Docker Compose 파일에 서비스를 추가하고 Traefik 라우터 설정을 정의합니다.
+
+### 주의사항
+
+- Cloudflare API 키는 매우 민감한 정보입니다. 안전하게 관리하고 접근을 제한해야 합니다.
+- HTTPS를 사용하는 것이 보안에 좋으므로, 가능한 한 HTTPS 리다이렉션을 활성화하는 것을 고려하세요.
+- 와일드카드 인증서는 도메인의 모든 서브도메인에 적용됩니다. 관리에 주의하세요.
+
+Traefik에서 동적 구성 파일은 라우터, 미들웨어, 서비스 등과 같은 Traefik의 동적 요소를 정의하는 데 사용됩니다. 이 파일은 Traefik이 실행 중에도 업데이트될 수 있으며, Traefik의 동작 방식을 세밀하게 제어할 수 있게 해줍니다.
+
+### 동적 구성 파일 작성 기본
+
+동적 구성 파일은 YAML 또는 TOML 형식으로 작성될 수 있으며, 여기서는 YAML 형식을 예로 들겠습니다.
+
+1. **기본 구조**:
+   동적 구성 파일은 `http` 블록으로 시작하며, 이 안에 `routers`, `middlewares`, `services` 등의 섹션이 포함됩니다.
+
+   ```yaml
+   http:
+     routers:
+       # 라우터 정의
+     middlewares:
+       # 미들웨어 정의
+     services:
+       # 서비스 정의
+   ```
+
+2. **라우터 설정**:
+   라우터는 요청을 처리하고 적절한 서비스로 라우팅하는 규칙을 정의합니다.
+
+   ```yaml
+   http:
+     routers:
+       my-router:
+         rule: "Host(`example.com`)"
+         service: "my-service"
+         middlewares:
+           - "my-middleware"
+         tls:
+           certResolver: "myresolver"
+   ```
+
+   여기서 `my-router`는 라우터의 이름, `Host(`example.com`)`는 라우팅 규칙, `my-service`는 요청을 처리할 서비스, `my-middleware`는 적용할 미들웨어, `myresolver`는 TLS 인증서 해결자입니다.
+
+3. **미들웨어 설정**:
+   미들웨어는 요청이 서비스에 도달하기 전에 적용되는 처리 규칙을 정의합니다.
+
+   ```yaml
+   http:
+     middlewares:
+       my-middleware:
+         stripPrefix:
+           prefixes:
+             - "/prefix"
+   ```
+
+   여기서 `my-middleware`는 미들웨어의 이름, `stripPrefix`는 적용할 미들웨어 유형입니다.
+
+4. **서비스 설정**:
+   서비스는 실제 요청을 처리하는 백엔드 서비스를 정의합니다.
+
+   ```yaml
+   http:
+     services:
+       my-service:
+         loadBalancer:
+           servers:
+             - url: "http://172.17.0.2:80"
+   ```
+
+   `my-service`는 서비스의 이름, `loadBalancer`는 요청을 분산할 방법, `servers`는 백엔드 서버의 목록입니다.
+
+### 파일 연결
+
+- 작성된 동적 구성 파일은 Traefik 설정에서 참조되어야 합니다. 이는 `traefik.yml` 또는 `docker-compose.yml` 파일에서 `command` 옵션 또는 `volumes`를 통해 설정할 수 있습니다.
+
+- 예를 들어, `docker-compose.yml`에서 볼륨으로 연결:
+
+  ```yaml
+  services:
+    traefik:
+      image: traefik:v2.2
+      volumes:
+        - ./dynamic_conf.yml:/etc/traefik/dynamic_conf.yml
+  ```
+
+  그리고 `traefik.yml`에서 참조:
+
+  ```yaml
+  providers:
+    file:
+      filename: /etc/traefik/dynamic_conf.yml
+  ```
+
+### 와일드카드 인증서 설정을 위한 동적 구성
+
+위에서 설명한 방법을 사용하여 와일드카드 인증서 설정을 위한 동적 구성을 작성할 수 있습니다. 각 도메인에 대한 라우터를 정의하고, 필요한 경우 특정 미들웨어 및 서비스를 적용합니다. 주의할 점은, 와일드카드 인증서를 사용하려면 DNS 챌린지를 통해 이를 구성해야 한다는 것입니다.
